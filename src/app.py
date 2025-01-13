@@ -11,7 +11,7 @@ def main():
         if user_input.lower() in ["quit", "exit"]:
             print("Merci d'avoir utilisé notre support technique. Au revoir !")
             break
-        response = agent.handle_user_input(user_input)
+        response = agent.handle_input(user_input)
         print(f"Agent: {response}")
 
 if __name__ == "__main__":
