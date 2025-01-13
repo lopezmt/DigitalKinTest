@@ -3,8 +3,10 @@ from openai import OpenAI
 client = OpenAI()
 
 class Agent:
-    def __init__(self, system_prompt, description, agents):
+    def __init__(self, name, description, system_prompt, agents):
         self.system_prompt = system_prompt
+        self.description = description
+        self.name = name
         self.history = [
             {"role": "system", "content": self.system_prompt}
         ]
@@ -18,12 +20,20 @@ class Agent:
                                                   functions=None,
                                                   function_call=None)
 
-        if "function_call" in response.choices[0].message:
-            function_call = response.choices[0].message.function_call
-            arguments = json.loads(function_call["arguments"])
-
-            self.history.append(
-                {"role": "assistant", "content": f"Appel de la fonction: {function_call['name']} avec les arguments {arguments}."}
-            )
-
         return response.choices[0].message.content
+    
+    def get_function_description(self):
+        # function description to be used with openai api
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"}
+                    },
+                },
+            },
+        }
