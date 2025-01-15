@@ -8,9 +8,6 @@ Ce projet utilise **uv** pour gérer les dépendances et l'environnement virtuel
 Pour utiliser l'assistant, lancez la commande suivante :  
 `uv run src/app.py`
 
-
-markdown
-Copier le code
 # Variables d'environnement
 Pour configurer l'accès à OpenAI, il faut placer à la racine du projet un fichier `.env` comme suit :
 
