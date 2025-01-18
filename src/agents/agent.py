@@ -32,7 +32,8 @@ class Agent:
 
         # Handle function calls
         while (
-            response.choices[0].message.tool_calls
+            response is not None
+            and response.choices[0].message.tool_calls
             and len(response.choices[0].message.tool_calls) > 0
         ):
             self.history.append(response.choices[0].message)
@@ -75,9 +76,11 @@ class Agent:
 
             response = await self.completion()
 
-        self.history.append(response.choices[0].message)
-
-        return response.choices[0].message.content
+        if response is not None:
+            self.history.append(response.choices[0].message)
+            return response.choices[0].message.content
+        else:
+            return "An error occurred during completion."
 
     def get_agent(self, name):
         for agent in self.agents:
@@ -92,12 +95,16 @@ class Agent:
         return None
 
     async def completion(self):
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=self.history,
-            tools=self.function_descriptions if self.function_descriptions else None,
-        )
-        return response
+        try:
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=self.history,
+                tools=self.function_descriptions if self.function_descriptions else None,
+            )
+            return response
+        except Exception as e:
+            print(f"An error occurred during completion: {e}")
+            return None
 
     def get_function_description(self):
         return {
