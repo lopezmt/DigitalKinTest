@@ -24,7 +24,7 @@ async def set_starters():
             ),
         cl.Starter(
             label="Unable to print",
-            message="I can't print using my pinter, what could be wrong?",
+            message="I can't print using my printer, what could be wrong?",
             icon="/public/idea.svg",
             ),
         ]
