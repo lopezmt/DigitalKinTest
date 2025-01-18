@@ -9,11 +9,12 @@ Do not answer on your own, use the agents.
 If they do not provide relevant information, you can say you didn't find any relevant information.
 """
 description = "Assistant communiquant directement avec l'utilisateur"
-def UserAgent():
-    tech_agent = TechnicalAgent()
+def UserAgent(use_chainlit=False):
+    tech_agent = TechnicalAgent(use_chainlit=use_chainlit)
     return Agent(
         name=name,
         system_prompt=systemPrompt, 
         description=description,
-        agents=[tech_agent]
+        agents=[tech_agent],
+        use_chainlit=use_chainlit
     )

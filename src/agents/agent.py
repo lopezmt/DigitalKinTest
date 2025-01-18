@@ -1,12 +1,20 @@
 import json
 from openai import AsyncOpenAI
+
 client = AsyncOpenAI()
 
 class Agent:
-    def __init__(self, name, description, system_prompt, agents=None, tools=None):
+    def __init__(self, name, description, system_prompt, agents=None, tools=None, use_chainlit=False):
         self.system_prompt = system_prompt
         self.description = description
         self.name = name
+        self.use_chainlit = use_chainlit
+        # Dynamically import chainlit if it is used
+        # This is done to avoid importing chainlit when using the command line interface
+        # when imported with the command line interface, chainlit produce a lot of outputs that are not desired
+        if self.use_chainlit:
+            import chainlit as cl
+            self.cl = cl
         self.history = [{"role": "system", "content": self.system_prompt}]
         self.agents = agents if agents else []
         self.tools = tools if tools else []
@@ -36,13 +44,27 @@ class Agent:
             # Find the appropriate agent or tool
             agent = self.get_agent(agent_name)
             if agent:
-                print(f"Calling agent {agent_name} with query: {query}")
-                answer = await agent.handle_input(query)
+                if self.use_chainlit:
+                    async with self.cl.Step(name=f"{agent_name} agent") as step:
+                        answer = await agent.handle_input(query)
+                        step.input = query
+                        step.output = answer
+                else:
+                    print(f"Calling agent {agent_name} with query: {query}")
+                    answer = await agent.handle_input(query)
 
             tool = self.get_tool(agent_name)
             if tool:
-                print(f"Calling tool {agent_name} with query: {query}")
-                answer = tool.execute(query)
+                if self.use_chainlit:
+                    async with self.cl.Step(name=f"{agent_name} tool") as step:
+                        print(f"Calling tool {agent_name} with query: {query}")
+                        answer = tool.execute(query)
+                        step.input = query
+                        step.output = answer
+                else:
+                    print(f"Calling tool {agent_name} with query: {query}")
+                    answer = tool.execute(query)
+
 
             function_call_result_message = {
                 "role": "tool",

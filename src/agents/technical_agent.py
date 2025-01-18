@@ -7,11 +7,12 @@ You can use it to find information about technical issues and their solutions.
 If the findings does not seem relevant to you, do not hesitate to say you didn't find any relevant information.
 """
 
-def TechnicalAgent():
+def TechnicalAgent(use_chainlit=False):
     technical_data_tool = SearchTechnicalDataTool()
     return Agent(
         name=name,
         system_prompt=systemPrompt, 
         description=description,
-        tools=[technical_data_tool]
+        tools=[technical_data_tool],
+        use_chainlit=use_chainlit
     )

@@ -3,7 +3,7 @@ load_dotenv()
 from agents.user_agent import UserAgent
 import chainlit as cl
 
-agent = UserAgent()
+agent = UserAgent(use_chainlit=True)
 
 @cl.on_message
 async def main(message: cl.Message):
