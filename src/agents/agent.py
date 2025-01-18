@@ -1,79 +1,83 @@
 import json
-from openai import OpenAI
-client = OpenAI()
+from openai import AsyncOpenAI
+client = AsyncOpenAI()
 
 class Agent:
-    def __init__(self, name, description, system_prompt, agents = [], tools = []):
+    def __init__(self, name, description, system_prompt, agents=None, tools=None):
         self.system_prompt = system_prompt
         self.description = description
         self.name = name
-        self.history = [
-            {"role": "system", "content": self.system_prompt}
+        self.history = [{"role": "system", "content": self.system_prompt}]
+        self.agents = agents if agents else []
+        self.tools = tools if tools else []
+
+        self.function_descriptions = [
+            agent.get_function_description() for agent in self.agents
+        ] + [
+            tool.get_function_description() for tool in self.tools
         ]
-        self.agents = agents
-        self.tools = tools
 
-        self.function_descriptions = []
-        self.function_descriptions = [agent.get_function_description() for agent in self.agents]
-        self.function_descriptions += [tool.get_function_description() for tool in self.tools]
-
-    def handle_input(self, user_input):
+    async def handle_input(self, user_input):
         self.history.append({"role": "user", "content": user_input})
 
-        response = self.completion()
+        response = await self.completion()
 
-        #handle function call
-        while (response.choices[0].message.tool_calls
-            and len(response.choices[0].message.tool_calls) > 0):
+        # Handle function calls
+        while (
+            response.choices[0].message.tool_calls
+            and len(response.choices[0].message.tool_calls) > 0
+        ):
             self.history.append(response.choices[0].message)
-            #We consider only one tool call for now
             tool_call = response.choices[0].message.tool_calls[0]
-            agentName = tool_call.function.name
+            agent_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments)
             query = arguments.get('query')
 
-            agent = self.get_agent(agentName)
+            # Find the appropriate agent or tool
+            agent = self.get_agent(agent_name)
             if agent:
-                print(f"Calling agent {agentName} with query: {query}")
-                answer = agent.handle_input(query)
+                print(f"Calling agent {agent_name} with query: {query}")
+                answer = await agent.handle_input(query)
 
-            tool = self.get_tool(agentName)
+            tool = self.get_tool(agent_name)
             if tool:
-                print(f"Calling tool {agentName} with query: {query}")
+                print(f"Calling tool {agent_name} with query: {query}")
                 answer = tool.execute(query)
+
             function_call_result_message = {
                 "role": "tool",
                 "content": answer,
                 "tool_call_id": tool_call.id
             }
             self.history.append(function_call_result_message)
-            
-            response = self.completion()
+
+            response = await self.completion()
+
         self.history.append(response.choices[0].message)
 
         return response.choices[0].message.content
-    
+
     def get_agent(self, name):
         for agent in self.agents:
             if agent.name == name:
                 return agent
         return None
-    
+
     def get_tool(self, name):
         for tool in self.tools:
             if tool.name == name:
                 return tool
         return None
-    
-    def completion(self):
-        response = client.chat.completions.create(model="gpt-4o-mini",
-                                                  messages=self.history,
-                                                  tools=self.function_descriptions if len(self.function_descriptions) > 0 else None,
+
+    async def completion(self):
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=self.history,
+            tools=self.function_descriptions if self.function_descriptions else None,
         )
         return response
-    
+
     def get_function_description(self):
-        # function description to be used with openai api
         return {
             "type": "function",
             "function": {

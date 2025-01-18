@@ -7,7 +7,7 @@ agent = UserAgent()
 
 @cl.on_message
 async def main(message: cl.Message):
-    response = agent.handle_input(message.content)
+    response = await agent.handle_input(message.content)
 
     # Send a response back to the user
     await cl.Message(
