@@ -36,45 +36,7 @@ class Agent:
             and response.choices[0].message.tool_calls
             and len(response.choices[0].message.tool_calls) > 0
         ):
-            self.history.append(response.choices[0].message)
-            tool_call = response.choices[0].message.tool_calls[0]
-            agent_name = tool_call.function.name
-            arguments = json.loads(tool_call.function.arguments)
-            query = arguments.get('query')
-
-            # Find the appropriate agent or tool
-            agent = self.get_agent(agent_name)
-            if agent:
-                if self.use_chainlit:
-                    async with self.cl.Step(name=f"{agent_name} agent") as step:
-                        answer = await agent.handle_input(query)
-                        step.input = query
-                        step.output = answer
-                else:
-                    print(f"Calling agent {agent_name} with query: {query}")
-                    answer = await agent.handle_input(query)
-
-            tool = self.get_tool(agent_name)
-            if tool:
-                if self.use_chainlit:
-                    async with self.cl.Step(name=f"{agent_name} tool") as step:
-                        print(f"Calling tool {agent_name} with query: {query}")
-                        answer = tool.execute(query)
-                        step.input = query
-                        step.output = answer
-                else:
-                    print(f"Calling tool {agent_name} with query: {query}")
-                    answer = tool.execute(query)
-
-
-            function_call_result_message = {
-                "role": "tool",
-                "content": answer,
-                "tool_call_id": tool_call.id
-            }
-            self.history.append(function_call_result_message)
-
-            response = await self.completion()
+            response = await self.handle_tool_call(response)
 
         if response is not None:
             self.history.append(response.choices[0].message)
@@ -82,6 +44,46 @@ class Agent:
         else:
             return "An error occurred during completion."
 
+    async def handle_tool_call(self, tool_call):
+        self.history.append(tool_call.choices[0].message)
+        tool_call = tool_call.choices[0].message.tool_calls[0]
+        function_name = tool_call.function.name
+        arguments = json.loads(tool_call.function.arguments)
+        query = arguments.get('query')
+
+        # Find the appropriate agent or tool
+        agent = self.get_agent(function_name)
+        if agent:
+            if self.use_chainlit:
+                async with self.cl.Step(name=f"{function_name} agent") as step:
+                    answer = await agent.handle_input(query)
+                    step.input = query
+                    step.output = answer
+            else:
+                print(f"Calling agent {function_name} with query: {query}")
+                answer = await agent.handle_input(query)
+
+        tool = self.get_tool(function_name)
+        if tool:
+            if self.use_chainlit:
+                async with self.cl.Step(name=f"{function_name} tool") as step:
+                    answer = tool.execute(query)
+                    step.input = query
+                    step.output = answer
+            else:
+                print(f"Calling tool {function_name} with query: {query}")
+                answer = tool.execute(query)
+
+
+        function_call_result_message = {
+            "role": "tool",
+            "content": answer,
+            "tool_call_id": tool_call.id
+        }
+        self.history.append(function_call_result_message)
+
+        return await self.completion()
+    
     def get_agent(self, name):
         for agent in self.agents:
             if agent.name == name:
