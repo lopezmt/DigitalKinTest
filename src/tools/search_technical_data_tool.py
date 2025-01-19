@@ -1,44 +1,69 @@
 import json
-#from tools.tool import Tool
-from sentence_transformers import SentenceTransformer, util
-import json
-
+from openai import OpenAI
+import numpy as np
 from tools.tool import Tool
 
-# Load your JSON file
-with open('./data/data_test_python.json', 'r') as file:
-    data = json.load(file)
+client = OpenAI()
 
-# Extract the issues and their associated steps
-issues = [scenario['issue'] for scenario in data['troubleshooting_scenarios']]
-
-# Initialize a pre-trained model for generating embeddings
-print("Loading embeddings model...")
-model = SentenceTransformer('all-MiniLM-L6-v2')  # Lightweight and fast
-
-# Generate embeddings for the issues
-print("Generating embeddings for the issues...")
-issue_embeddings = model.encode(issues, convert_to_tensor=True)
-
-# Function to find the most relevant issue for a query
-def find_matching_issue(query):
-    query_embedding = model.encode(query, convert_to_tensor=True)
-    similarities = util.cos_sim(query_embedding, issue_embeddings)
-    top_k = 3  # Number of top matches to retrieve
-    top_k_indices = similarities.topk(top_k).indices[0].tolist()  # Get the indices of the top k similarity scores
+def generate_embeddings(texts):
+    try:
+        response = client.embeddings.create(input = texts, model="text-embedding-3-small")
+        return np.array([np.array(embeddingObj.embedding) for embeddingObj in response.data])
+    except Exception as e:
+        print(f"An error occurred while generating embeddings: {e}")
+        return None
     
+def initialize():
+    print("Initializing the search technical data tool...")
+    # Load your JSON file
+    with open('./data/data_test_python.json', 'r') as file:
+        data = json.load(file)
+
+    # Extract the issues and their associated steps
+    issues = [scenario['issue'] for scenario in data['troubleshooting_scenarios']]
+
+    print("Generating embeddings for the issues...")
+    issue_embeddings = generate_embeddings(issues)
+
+    return data, issues, issue_embeddings
+
+def compute_cosine_similarity(query_embedding, issue_embeddings):
+    # Normalize embeddings
+    query_norm = query_embedding / np.linalg.norm(query_embedding)
+    issues_norm = issue_embeddings / np.linalg.norm(issue_embeddings, axis=1, keepdims=True)
+    # Compute cosine similarities
+    return np.dot(issues_norm, query_norm)
+
+# Initialize the tool
+data, issues, issue_embeddings = initialize()
+
+def find_matching_issue(query):
+    if issue_embeddings is None:
+        return "An error occurred while generating embeddings for the issues"
+    query_embedding = generate_embeddings([query])
+    if query_embedding is None:
+        return "An error occurred while generating embeddings for the query"
+    similarities = compute_cosine_similarity(query_embedding[0], issue_embeddings)
+
+    # Get the indices of the top k similarity scores
+    top_k = 3
+    top_k_indices = np.argsort(similarities)[-top_k:][::-1]  # Sort and reverse for descending order
+
+    # Prepare the top matches
     top_matches = []
     for idx in top_k_indices:
         top_matches.append({
             "issue": issues[idx],
             "steps": data['troubleshooting_scenarios'][idx]['steps'],
-            "similarity_score": float(similarities[0, idx])  # Convert tensor to float
+            "similarity_score": similarities[idx]
         })
-    
-    return json.dumps(top_matches)
 
+    return json.dumps(top_matches, indent=2)
 
+# Tool wrapper
 def SearchTechnicalDataTool():
-    return Tool(description="Search technical data in the knowledge base",
-                name="search-technical-data",
-                function=find_matching_issue)
+    return Tool(
+        description="Search technical data in the knowledge base",
+        name="search-technical-data",
+        function=find_matching_issue
+    )
